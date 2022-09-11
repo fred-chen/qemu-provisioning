@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 usage() {
     printf "\nUsage: $(basename $0) <cloud_image_dir>\n\n"
@@ -19,7 +19,7 @@ main () {
             echo "${CLOUD_IMG_DIR} does not exist! Making one..."; 
             mkdir -p ${CLOUD_IMG_DIR}; 
         }
-
+    echo "cloud-image-dir: ${CLOUD_IMG_DIR}" > settings.yaml
     source /etc/os-release && echo "OS: $NAME"
 
     case $NAME in
