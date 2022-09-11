@@ -1,0 +1,22 @@
+# following cluster definition will create a cluster
+# with nodes: node.chenp.net, node1.chenp.net, node2.chenp.net ... node4.chenp.net
+# with IP address from 10.1.0.60 ~ 10.1.0.64
+
+clusterName: node
+domainName: chenp.net
+imagePath: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-arm64.img
+systemDiskSize: 20g
+dataDiskSize: 100g
+cpu: 2
+mem: 4g
+nodes:
+- name: node
+  ipAddress: 10.1.0.60
+- name: node1
+  ipAddress: 10.1.0.61
+- name: node2
+  ipAddress: 10.1.0.62
+- name: node3
+  ipAddress: 10.1.0.63
+- name: node4
+  ipAddress: 10.1.0.64
