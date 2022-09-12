@@ -5,7 +5,7 @@
 clusterName: test_template
 domainName: chenp.net
 imagePath: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
-guestOs: Ubuntu
+guestOs: Ubuntu               # or CentOS
 systemDiskSize: 20g
 dataDiskSizes:
 - 100g

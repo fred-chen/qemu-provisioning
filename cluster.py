@@ -148,6 +148,10 @@ class Deployer_Ubuntu(IDeployer):
                         nodeDeployer = NodeDeployer_Ubuntu(node)
                         nodeDeployer.create_node (vnc_port)
                         vnc_port += 1
+                    case "CentOS":
+                        nodeDeployer = NodeDeployer_CentOS(node)
+                        nodeDeployer.create_node (vnc_port)
+                        vnc_port += 1
                     case other:
                         pass
             # create start_cluster.sh
@@ -398,6 +402,9 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
             }
         }
         return yaml.safe_dump(content, width=1000), mac
+
+class NodeDeployer_CentOS(NodeDeployer_Ubuntu):
+    pass
 
 def distro() -> str:
     v = platform.freedesktop_os_release()
