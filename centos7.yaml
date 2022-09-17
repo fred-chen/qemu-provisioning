@@ -1,7 +1,3 @@
-# following cluster definition will create a cluster
-# with nodes: node.chenp.net, node1.chenp.net, node2.chenp.net ... node4.chenp.net
-# with IP address from 10.1.0.60 ~ 10.1.0.64
-
 clusterName: centos7
 domainName: chenp.net
 imagePath: https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-2111.qcow2

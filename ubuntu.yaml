@@ -1,5 +1,5 @@
 # following cluster definition will create a cluster
-# with nodes: node.chenp.net, node1.chenp.net, node2.chenp.net ... node4.chenp.net
+# with nodes: ubuntu.chenp.net, ubuntu1.chenp.net ... ubuntu4.chenp.net
 # with IP address from 10.1.0.60 ~ 10.1.0.64
 
 clusterName: ubuntu

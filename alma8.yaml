@@ -1,7 +1,3 @@
-# following cluster definition will create a cluster
-# with nodes: node.chenp.net, node1.chenp.net, node2.chenp.net ... node4.chenp.net
-# with IP address from 10.1.0.60 ~ 10.1.0.64
-
 clusterName: alma8
 domainName: chenp.net
 imagePath: https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-8.6-20220831.x86_64.qcow2
