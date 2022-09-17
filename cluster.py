@@ -475,10 +475,8 @@ class NodeDeployer_Alma8(NodeDeployer_CentOS8):
         """
         content =   'network-interfaces: |' + "\n" + \
                     '    iface eth0 inet static' + "\n" + \
-                    '    address 10.1.0.60' + "\n" + \
-                    '    network 10.1.0.0' + "\n" + \
+                    '    address {}'.format(node_settings["ipAddress"]) + "\n" + \
                     '    netmask 255.255.255.0' + "\n" + \
-                    '    broadcast 10.1.0.255' + "\n" + \
                     '    gateway {}'.format(node_settings["gateway"]) + os.linesep
         return content
     
