@@ -455,6 +455,13 @@ class NodeDeployer_CentOS7(NodeDeployer_Ubuntu):
 class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
     pass
 class NodeDeployer_Alma8(NodeDeployer_CentOS8):
+    def gen_user(self, node_settings, mac: str) -> str:
+        content = super().gen_user(node_settings, mac) + os.linesep
+        content +=  'bootcmd:' + os.linesep + \
+                    '    - nmcli device connect eth0' + os.linesep
+        return content
+        
+        
     def gen_meta(self, node_settings, mac: str):
         """
             in file meta-data:
@@ -472,7 +479,7 @@ class NodeDeployer_Alma8(NodeDeployer_CentOS8):
                     '    network 10.1.0.0' + "\n" + \
                     '    netmask 255.255.255.0' + "\n" + \
                     '    broadcast 10.1.0.255' + "\n" + \
-                    '    gateway {}'.format(node_settings["gateway"]) + "\n"
+                    '    gateway {}'.format(node_settings["gateway"]) + os.linesep
         return content
     
     def gen_netconf(self, node_settings, mac: str) -> str:
