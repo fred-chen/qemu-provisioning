@@ -153,8 +153,20 @@ class Deployer_Ubuntu(IDeployer):
                         nodeDeployer = NodeDeployer_Ubuntu(node)
                         nodeDeployer.create_node (vnc_port)
                         vnc_port += 1
-                    case "CentOS":
-                        nodeDeployer = NodeDeployer_CentOS(node)
+                    case "CentOS7":
+                        nodeDeployer = NodeDeployer_CentOS7(node)
+                        nodeDeployer.create_node (vnc_port)
+                        vnc_port += 1
+                    case "CentOS8":
+                        nodeDeployer = NodeDeployer_CentOS7(node)
+                        nodeDeployer.create_node (vnc_port)
+                        vnc_port += 1
+                    case "Alma8":
+                        nodeDeployer = NodeDeployer_Alma8(node)
+                        nodeDeployer.create_node (vnc_port)
+                        vnc_port += 1
+                    case "Alma9":
+                        nodeDeployer = NodeDeployer_Alma9(node)
                         nodeDeployer.create_node (vnc_port)
                         vnc_port += 1
                     case other:
@@ -212,25 +224,13 @@ class NodeDeployer_Ubuntu:
         cloud_init_dir = clusterName + "/" + nodeName + "/" + "cloud-init"
         os.makedirs(cloud_init_dir, exist_ok=True)
 
+        # generating mac address for vm
+        mac = self.gen_mac("qemu")
+
         # prepare cloud-init config files
-        meta_content = self.gen_meta(self.node_settings)
-        user_content = self.gen_user(self.node_settings)
-        netconfig_content, mac = self.gen_netconf(self.node_settings)
-        
-        meta_path = cloud_init_dir + "/" + "meta-data"
-        user_path = cloud_init_dir + "/" + "user-data"
-        network_config_path = cloud_init_dir + "/" + "network-config"
-        
-        f_meta = open(meta_path, 'w')
-        f_meta.write(meta_content)
-        f_user = open(user_path, 'w')
-        f_user.write("#cloud-config" + os.linesep + os.linesep)
-        f_user.write(user_content)
-        f_netconfig = open(network_config_path, 'w')
-        f_netconfig.write(netconfig_content)
-        f_meta.close()
-        f_user.close()
-        f_netconfig.close()
+        self.write_meta(mac)
+        self.write_netconf(mac)
+        self.write_user(mac)
         
         # create cloud-init-provisioning.iso
         cmd = "cloud-localds -v --network-config={cloud_init_dir}/network-config {cloud_init_dir}/cloud-init-provisioning.iso {cloud_init_dir}/user-data {cloud_init_dir}/meta-data"
@@ -251,13 +251,8 @@ class NodeDeployer_Ubuntu:
             exe (cmd)
             
         # prepare start.sh
-        cluster_dir = clusterName
-        start_script_path = node_dir + "/" + "start.sh"
-        f_startup_script = open(start_script_path, 'wb')
-        f_startup_script.write(self.gen_startup_script(mac, port))
-        f_startup_script.close()
-        os.chmod(start_script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR )
-        
+        self.write_startup_script(mac, port)
+    
     def gen_startup_script(self, mac: str, port: int):
         script = """\
 #!/usr/bin/bash
@@ -317,9 +312,9 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
 """
         return script.encode('utf-8')
 
-    def gen_meta(self, node_settings) -> str:
+    def gen_meta(self, node_settings, mac: str) -> str:
         return ""
-    def gen_user(self, node_settings) -> str:
+    def gen_user(self, node_settings, mac: str) -> str:
         """
             generate and return contents of user-data
             based on node settings from parameter.
@@ -371,7 +366,7 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
                 ssh_authorized_keys.append (key)
         return yaml.dump(content, width=1000)
         
-    def gen_netconf(self, node_settings) -> str:
+    def gen_netconf(self, node_settings, mac: str) -> str:
         """
             generate a netplan file for cloud-init utilities.
             an example of netplan file content:
@@ -393,7 +388,6 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
                 - chenp.net
                 mtu: 9000
         """
-        mac = randomMAC("qemu")
         content = {
             'version': 2,
             'ethernets': {
@@ -406,9 +400,84 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
                 }
             }
         }
-        return yaml.safe_dump(content, width=1000), mac
+        return yaml.safe_dump(content, width=1000)
+    
+    def gen_mac(self, qemu_or_xen):
+        return randomMAC(qemu_or_xen)
+    
+    def write_meta(self, mac: str):
+        clusterName    = self.node_settings["clusterName"]
+        nodeName       = self.node_settings["name"]
 
-class NodeDeployer_CentOS(NodeDeployer_Ubuntu):
+        cloud_init_dir = clusterName + "/" + nodeName + "/" + "cloud-init"
+        meta_path = cloud_init_dir + "/" + "meta-data"
+        
+        f_meta = open(meta_path, 'w')
+        f_meta.write(self.gen_meta(self.node_settings, mac))
+        f_meta.close()
+
+    def write_netconf(self, mac: str):
+        clusterName    = self.node_settings["clusterName"]
+        nodeName       = self.node_settings["name"]
+
+        cloud_init_dir = clusterName + "/" + nodeName + "/" + "cloud-init"
+        netconf_path = cloud_init_dir + "/" + "network-config"
+        
+        f_netconf = open(netconf_path, 'w')
+        f_netconf.write(self.gen_netconf(self.node_settings, mac))
+        f_netconf.close()
+
+    def write_user(self, mac: str):
+        clusterName    = self.node_settings["clusterName"]
+        nodeName       = self.node_settings["name"]
+
+        cloud_init_dir = clusterName + "/" + nodeName + "/" + "cloud-init"
+        user_path = cloud_init_dir + "/" + "user-data"
+        
+        f_user = open(user_path, 'w')
+        f_user.write("#cloud-config" + os.linesep + os.linesep)
+        f_user.write(self.gen_user(self.node_settings, mac))
+        f_user.close()
+        
+    def write_startup_script(self, mac, port):
+        # prepare start.sh
+        clusterName    = self.node_settings["clusterName"]
+        nodeName       = self.node_settings["name"]
+
+        node_dir = clusterName + "/" + nodeName
+        start_script_path = node_dir + "/" + "start.sh"
+        f_startup_script = open(start_script_path, 'wb')
+        f_startup_script.write(self.gen_startup_script(mac, port))
+        f_startup_script.close()
+        os.chmod(start_script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR )
+class NodeDeployer_CentOS7(NodeDeployer_Ubuntu):
+    pass
+class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
+    pass
+class NodeDeployer_Alma8(NodeDeployer_CentOS8):
+    def gen_meta(self, node_settings, mac: str):
+        """
+            in file meta-data:
+            network-interfaces: |
+                iface eth0 inet static
+                address 192.168.122.8
+                network 192.168.122.0
+                netmask 255.255.255.0
+                broadcast 192.168.1.255
+                gateway 192.168.122.1
+        """
+        content =   'network-interfaces: |' + "\n" + \
+                    '    iface eth0 inet static' + "\n" + \
+                    '    address 10.1.0.60' + "\n" + \
+                    '    network 10.1.0.0' + "\n" + \
+                    '    netmask 255.255.255.0' + "\n" + \
+                    '    broadcast 10.1.0.255' + "\n" + \
+                    '    gateway {}'.format(node_settings["gateway"]) + "\n"
+        return content
+    
+    def gen_netconf(self, node_settings, mac: str) -> str:
+        return ""
+class NodeDeployer_Alma9(NodeDeployer_Alma8):
     pass
 
 def distro() -> str:
