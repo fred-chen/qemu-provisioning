@@ -29,8 +29,13 @@ def download_to(url, target_dir=None):
     return filepath
 
 def check_path(path: str):
-    if not os.path.exists(path):
-        raise ( Exception("{} does not exist!".format(path)) )
+    localpath = path
+    if not os.path.exists(localpath):
+        localpath = g_settings["cloud-image-dir"] + "/" + localpath
+        if not localpath:
+            raise ( Exception("{} does not exist!".format(path)) )
+    return localpath
+    
 
 def script_path() -> str:
     return os.path.dirname(__file__)
@@ -199,8 +204,8 @@ class NodeDeployer_Ubuntu:
         if parse.urlparse(imagePath).scheme in ('http', 'https'):
             localImage = download_to(imagePath)
         else:
-            localImage = imagePath    
-        check_path(localImage)
+            localImage = imagePath
+        localImage = check_path(localImage)
         print("using {}".format(localImage))
 
         # create node dirs
