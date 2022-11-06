@@ -49,7 +49,7 @@ nodes:
 ## Install
 
 ```bash
-git clone https://github.com/fred-chen/c.git
-cd https://github.com/fred-chen/qemu-provisioning
-init.sh <cloud_image_folder>
+git clone https://github.com/fred-chen/qemu-provisioning.git
+cd qemu-provisioning
+./init.sh <cloud_image_folder>
 ```

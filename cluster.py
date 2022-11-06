@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import yaml
-import os, stat
-import getopt, sys
+import os
+import stat
+import getopt
+import sys
 import urllib.parse as parse
 import platform
 import subprocess
@@ -10,13 +12,17 @@ import random
 
 g_settings = {}
 
+
 def load_settings():
-    g_settings.update (yaml.safe_load(open(script_path() + "/" + "settings.yaml").read()))
+    g_settings.update(yaml.safe_load(
+        open(script_path() + "/" + "settings.yaml").read()))
+
 
 def basenameurl(url: str):
     basename = os.path.basename(url)
     return basename
-    
+
+
 def download_to(url, target_dir=None):
     import requests
     if not target_dir:
@@ -28,26 +34,31 @@ def download_to(url, target_dir=None):
         open(filepath, "wb").write(response.content)
     return filepath
 
+
 def check_path(path: str):
     localpath = path
     if not os.path.exists(localpath):
         localpath = g_settings["cloud-image-dir"] + "/" + localpath
         if not localpath:
-            raise ( Exception("{} does not exist!".format(path)) )
+            raise (Exception("{} does not exist!".format(path)))
     return localpath
-    
+
 
 def script_path() -> str:
     return os.path.dirname(__file__)
 
+
 def usage(err: str):
+    print("Usage: {} deploy -f xxx.yaml".format(os.path.basename(sys.argv[0])))
     print(err)
     exit(1)
-    
+
 # this function is directly from xend/server/netif.py and is thus
 # available under the LGPL,
 # Copyright 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright 2005 XenSource Ltd
+
+
 def randomMAC(type="xen"):
     """Generate a random MAC address.
 
@@ -70,7 +81,7 @@ def randomMAC(type="xen"):
 
     @return: MAC address string
     """
-    ouis = { 'xen': [ 0x00, 0x16, 0x3E ], 'qemu': [ 0x52, 0x54, 0x00 ] }
+    ouis = {'xen': [0x00, 0x16, 0x3E], 'qemu': [0x52, 0x54, 0x00]}
 
     try:
         oui = ouis[type]
@@ -78,12 +89,13 @@ def randomMAC(type="xen"):
         oui = ouis['xen']
 
     mac = oui + [
-            random.randint(0x00, 0xff),
-            random.randint(0x00, 0xff),
-            random.randint(0x00, 0xff)]
+        random.randint(0x00, 0xff),
+        random.randint(0x00, 0xff),
+        random.randint(0x00, 0xff)]
     return ':'.join(map(lambda x: "%02x" % x, mac))
 
-def exe (cmd: str) -> int:
+
+def exe(cmd: str) -> int:
     rt = subprocess.call(cmd, shell=True)
     if rt != 0:
         raise "error when executing:\n {}\n".format(cmd)
@@ -95,36 +107,37 @@ def apply_handleopts(settings: dict):
     except getopt.GetoptError as err:
         usage(err)
     for o, a in options:
-        if(o in ('-f', '--configfile')):
+        if (o in ('-f', '--configfile')):
             settings["configfile"] = a
     for operation in args:
         print(operation)
+
 
 class IDeployer:
     def __init__(self, settings: dict):
         self.settings = settings
         self.flatten_settings()
-        
+
     def create_cluster(self) -> bool:
         raise "Error: not implemented"
-    
+
     def flatten_settings(self):
         # use cluster settings as defaults and populate to all nodes
         nodes = self.settings["nodes"]
         for node in nodes:
-            for key in ("clusterName", "domainName", "imagePath", 
-                        "systemDiskSize", "dataDiskSizes", "cpu", "mem", "mtu", "gateway", 
+            for key in ("clusterName", "domainName", "imagePath",
+                        "systemDiskSize", "dataDiskSizes", "cpu", "mem", "mtu", "gateway",
                         "nameserver", "guestOs", "authorized-keys"):
                 node[key] = self.settings[key] if key not in node else node[key]
-            
 
-class Deployer_Ubuntu(IDeployer):    
+
+class Deployer_Ubuntu(IDeployer):
     def __init__(self, settings: dict):
         IDeployer.__init__(self, settings)
-        
+
     def deploy(self) -> bool:
-        clusterName    = self.settings["clusterName"]
-        
+        clusterName = self.settings["clusterName"]
+
         if os.path.exists(clusterName):
             # cluster folder already exists
             return False
@@ -151,39 +164,41 @@ class Deployer_Ubuntu(IDeployer):
                 match node["guestOs"]:
                     case "Ubuntu":
                         nodeDeployer = NodeDeployer_Ubuntu(node)
-                        nodeDeployer.create_node (vnc_port)
+                        nodeDeployer.create_node(vnc_port)
                         vnc_port += 1
                     case "CentOS7":
                         nodeDeployer = NodeDeployer_CentOS7(node)
-                        nodeDeployer.create_node (vnc_port)
+                        nodeDeployer.create_node(vnc_port)
                         vnc_port += 1
                     case "CentOS8":
                         nodeDeployer = NodeDeployer_CentOS7(node)
-                        nodeDeployer.create_node (vnc_port)
+                        nodeDeployer.create_node(vnc_port)
                         vnc_port += 1
                     case "Alma8":
                         nodeDeployer = NodeDeployer_Alma8(node)
-                        nodeDeployer.create_node (vnc_port)
+                        nodeDeployer.create_node(vnc_port)
                         vnc_port += 1
                     case "Alma9":
                         nodeDeployer = NodeDeployer_Alma9(node)
-                        nodeDeployer.create_node (vnc_port)
+                        nodeDeployer.create_node(vnc_port)
                         vnc_port += 1
                     case other:
                         pass
             # create start_cluster.sh
             script_path = clusterName + "/" + "start_cluster.sh"
-            f_start_cluster = open ( script_path, 'w' )
+            f_start_cluster = open(script_path, 'w')
             for node in nodes:
-                f_start_cluster.write ( "cd {node_name} && ./start.sh && cd ..".format(node_name = node["name"]) + os.linesep )
+                f_start_cluster.write(
+                    "cd {node_name} && ./start.sh && cd ..".format(node_name=node["name"]) + os.linesep)
             f_start_cluster.close()
-            os.chmod(script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR )
+            os.chmod(script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR)
             return True
+
 
 class NodeDeployer_Ubuntu:
     def __init__(self, settings: dict):
         self.node_settings = settings
-        
+
     def create_node(self, port: int):
         """create a single node structure
             a node directory will be created inside the cluster folder.
@@ -192,7 +207,7 @@ class NodeDeployer_Ubuntu:
             2. a date disk ( if specified ) in qcow2 format
             3. a startup script with qemu command line in it
             4. a cloud-init sub-folder with a cloud-init iso for cloud image configurations.
-            
+
             # cluster_name
             #   |- start_cluster.sh
             #   |- stop_cluster.sh
@@ -206,11 +221,11 @@ class NodeDeployer_Ubuntu:
             #   |         |- network-config
             #   |         |- cloud-init-provisioning.iso
         """
-        clusterName    = self.node_settings["clusterName"]
-        imagePath      = self.node_settings["imagePath"]
-        nodeName       = self.node_settings["name"]
+        clusterName = self.node_settings["clusterName"]
+        imagePath = self.node_settings["imagePath"]
+        nodeName = self.node_settings["name"]
         systemDiskSize = self.node_settings["systemDiskSize"]
-        dataDiskSizes  = self.node_settings["dataDiskSizes"]
+        dataDiskSizes = self.node_settings["dataDiskSizes"]
 
         # download image if needed
         if parse.urlparse(imagePath).scheme in ('http', 'https'):
@@ -231,28 +246,30 @@ class NodeDeployer_Ubuntu:
         self.write_meta(mac)
         self.write_netconf(mac)
         self.write_user(mac)
-        
+
         # create cloud-init-provisioning.iso
         cmd = "cloud-localds -v --network-config={cloud_init_dir}/network-config {cloud_init_dir}/cloud-init-provisioning.iso {cloud_init_dir}/user-data {cloud_init_dir}/meta-data"
         cmd = cmd.format(cloud_init_dir=cloud_init_dir)
-        print (cmd)
-        exe (cmd)
-        
+        print(cmd)
+        exe(cmd)
+
         # prepare system.qcow2 and dataX.qcow2 (if defined)
         node_dir = clusterName + "/" + nodeName
         cmd = "qemu-img create -f qcow2 -F qcow2 -b {image_path} {disk_dir}/system.qcow2 {systemDiskSize}"
-        cmd = cmd.format (image_path=localImage, disk_dir=node_dir, systemDiskSize=systemDiskSize)
-        exe (cmd)
-        
+        cmd = cmd.format(image_path=localImage,
+                         disk_dir=node_dir, systemDiskSize=systemDiskSize)
+        exe(cmd)
+
         i = 1
         for size in dataDiskSizes:
-            cmd = "qemu-img create -f qcow2 {disk_dir}/data{n}.qcow2 {dataDiskSize}".format(disk_dir=node_dir, n=i, dataDiskSize=size)
+            cmd = "qemu-img create -f qcow2 {disk_dir}/data{n}.qcow2 {dataDiskSize}".format(
+                disk_dir=node_dir, n=i, dataDiskSize=size)
             i += 1
-            exe (cmd)
-            
+            exe(cmd)
+
         # prepare start.sh
         self.write_startup_script(mac, port)
-    
+
     def gen_startup_script(self, mac: str, port: int):
         script = """\
 #!/usr/bin/bash
@@ -288,7 +305,7 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
 -device virtio-net-pci,netdev=mynet0,mac={mac} \\
 -boot c \\
 """.format(node=self.node_settings["name"],
-           cpus=self.node_settings["cpu"], 
+           cpus=self.node_settings["cpu"],
            mem=self.node_settings["mem"],
            mtu=self.node_settings["mtu"],
            mac=mac,
@@ -296,9 +313,9 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
            )
 
         i = 1
-        dataDiskSizes  = self.node_settings["dataDiskSizes"]
-        clusterName    = self.node_settings["clusterName"]
-        nodeName       = self.node_settings["name"]
+        dataDiskSizes = self.node_settings["dataDiskSizes"]
+        clusterName = self.node_settings["clusterName"]
+        nodeName = self.node_settings["name"]
         node_dir = clusterName + "/" + nodeName
         for size in dataDiskSizes:
             script += """\
@@ -306,7 +323,7 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
 -device virtio-blk-pci,drive=D{n} \\
 """.format(disk_dir=node_dir, n=i)
             i += 1
-            
+
         script += """\
 --daemonize
 """
@@ -314,11 +331,12 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
 
     def gen_meta(self, node_settings, mac: str) -> str:
         return ""
+
     def gen_user(self, node_settings, mac: str) -> str:
         """
             generate and return contents of user-data
             based on node settings from parameter.
-            
+
             user-data content example:
             -------------------------
             #cloud-config
@@ -341,31 +359,31 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
                 - ssh-dss AAAAB3NzaC1kc3MAAACBANVJJTo ...
         """
         content = {
-            "hostname"        : node_settings["name"],
-            "fqdn"            : node_settings["name"] + "." + str.strip(node_settings["domainName"], "."),
+            "hostname": node_settings["name"],
+            "fqdn": node_settings["name"] + "." + str.strip(node_settings["domainName"], "."),
             "manage_etc_hosts": True,
-            "ssh_pwauth"      : False,
-            "disable_root"    : False,
+            "ssh_pwauth": False,
+            "disable_root": False,
             "users": [
-              { 
-                "name": "ubuntu", "home": "/home/ubuntu", "shell": "/bin/bash", "groups": "sudo", "sudo": "ALL=(ALL) NOPASSWD:ALL",
-                "lock_passwd": False,
-                "passwd": "$6$j0iQN7y/xQ7RCfkU$NIJ1ONRVdJumo1KJCkpwlezoaZOqAE/0IR2UIwmh/S0vQKuDVzRQ3bf2uU3CUSBCF2BB.6W3b8yJMQ9cNaa8E0",
-                "ssh-authorized-keys": []
-              },
-              { 
-                "name": "root",
-                "ssh-authorized-keys": []
-              },
+                {
+                    "name": "ubuntu", "home": "/home/ubuntu", "shell": "/bin/bash", "groups": "sudo", "sudo": "ALL=(ALL) NOPASSWD:ALL",
+                    "lock_passwd": False,
+                    "passwd": "$6$j0iQN7y/xQ7RCfkU$NIJ1ONRVdJumo1KJCkpwlezoaZOqAE/0IR2UIwmh/S0vQKuDVzRQ3bf2uU3CUSBCF2BB.6W3b8yJMQ9cNaa8E0",
+                    "ssh-authorized-keys": []
+                },
+                {
+                    "name": "root",
+                    "ssh-authorized-keys": []
+                },
             ]
         }
         # add keys defined in settings
         for user in content["users"]:
             ssh_authorized_keys = user["ssh-authorized-keys"]
             for key in node_settings["authorized-keys"]:
-                ssh_authorized_keys.append (key)
+                ssh_authorized_keys.append(key)
         return yaml.dump(content, width=1000)
-        
+
     def gen_netconf(self, node_settings, mac: str) -> str:
         """
             generate a netplan file for cloud-init utilities.
@@ -391,77 +409,82 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
         content = {
             'version': 2,
             'ethernets': {
-                'id0' : { 'match': {'macaddress': mac }, 'set-name': 'eth0' },
-                'eth0': { 
-                    'addresses'  : [ node_settings["ipAddress"] ], 
-                    'gateway4'   : node_settings["gateway"], 
-                    'nameservers': { 'addresses': [ node_settings["nameserver"] ], 'search': [ str.strip(node_settings["domainName"], ".") ] },
+                'id0': {'match': {'macaddress': mac}, 'set-name': 'eth0'},
+                'eth0': {
+                    'addresses': [node_settings["ipAddress"]],
+                    'gateway4': node_settings["gateway"],
+                    'nameservers': {'addresses': [node_settings["nameserver"]], 'search': [str.strip(node_settings["domainName"], ".")]},
                     'mtu': node_settings["mtu"]
                 }
             }
         }
         return yaml.safe_dump(content, width=1000)
-    
+
     def gen_mac(self, qemu_or_xen):
         return randomMAC(qemu_or_xen)
-    
+
     def write_meta(self, mac: str):
-        clusterName    = self.node_settings["clusterName"]
-        nodeName       = self.node_settings["name"]
+        clusterName = self.node_settings["clusterName"]
+        nodeName = self.node_settings["name"]
 
         cloud_init_dir = clusterName + "/" + nodeName + "/" + "cloud-init"
         meta_path = cloud_init_dir + "/" + "meta-data"
-        
+
         f_meta = open(meta_path, 'w')
         f_meta.write(self.gen_meta(self.node_settings, mac))
         f_meta.close()
 
     def write_netconf(self, mac: str):
-        clusterName    = self.node_settings["clusterName"]
-        nodeName       = self.node_settings["name"]
+        clusterName = self.node_settings["clusterName"]
+        nodeName = self.node_settings["name"]
 
         cloud_init_dir = clusterName + "/" + nodeName + "/" + "cloud-init"
         netconf_path = cloud_init_dir + "/" + "network-config"
-        
+
         f_netconf = open(netconf_path, 'w')
         f_netconf.write(self.gen_netconf(self.node_settings, mac))
         f_netconf.close()
 
     def write_user(self, mac: str):
-        clusterName    = self.node_settings["clusterName"]
-        nodeName       = self.node_settings["name"]
+        clusterName = self.node_settings["clusterName"]
+        nodeName = self.node_settings["name"]
 
         cloud_init_dir = clusterName + "/" + nodeName + "/" + "cloud-init"
         user_path = cloud_init_dir + "/" + "user-data"
-        
+
         f_user = open(user_path, 'w')
         f_user.write("#cloud-config" + os.linesep + os.linesep)
         f_user.write(self.gen_user(self.node_settings, mac))
         f_user.close()
-        
+
     def write_startup_script(self, mac, port):
         # prepare start.sh
-        clusterName    = self.node_settings["clusterName"]
-        nodeName       = self.node_settings["name"]
+        clusterName = self.node_settings["clusterName"]
+        nodeName = self.node_settings["name"]
 
         node_dir = clusterName + "/" + nodeName
         start_script_path = node_dir + "/" + "start.sh"
         f_startup_script = open(start_script_path, 'wb')
         f_startup_script.write(self.gen_startup_script(mac, port))
         f_startup_script.close()
-        os.chmod(start_script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR )
+        os.chmod(start_script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR)
+
+
 class NodeDeployer_CentOS7(NodeDeployer_Ubuntu):
     pass
+
+
 class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
     pass
+
+
 class NodeDeployer_Alma8(NodeDeployer_CentOS8):
     def gen_user(self, node_settings, mac: str) -> str:
         content = super().gen_user(node_settings, mac) + os.linesep
-        content +=  'bootcmd:' + os.linesep + \
-                    '    - nmcli device connect eth0' + os.linesep
+        content += 'bootcmd:' + os.linesep + \
+            '    - nmcli device connect eth0' + os.linesep
         return content
-        
-        
+
     def gen_meta(self, node_settings, mac: str):
         """
             in file meta-data:
@@ -473,32 +496,37 @@ class NodeDeployer_Alma8(NodeDeployer_CentOS8):
                 broadcast 192.168.1.255
                 gateway 192.168.122.1
         """
-        content =   'network-interfaces: |' + "\n" + \
-                    '    iface eth0 inet static' + "\n" + \
-                    '    address {}'.format(node_settings["ipAddress"]) + "\n" + \
-                    '    netmask 255.255.255.0' + "\n" + \
-                    '    gateway {}'.format(node_settings["gateway"]) + os.linesep
+        content = 'network-interfaces: |' + "\n" + \
+            '    iface eth0 inet static' + "\n" + \
+            '    address {}'.format(node_settings["ipAddress"]) + "\n" + \
+            '    netmask 255.255.255.0' + "\n" + \
+            '    gateway {}'.format(
+                node_settings["gateway"]) + os.linesep
         return content
-    
+
     def gen_netconf(self, node_settings, mac: str) -> str:
         return ""
+
+
 class NodeDeployer_Alma9(NodeDeployer_Alma8):
     pass
+
 
 def distro() -> str:
     v = platform.freedesktop_os_release()
     return v["NAME"]
 
+
 def cmd_deploy():
     # get config file path from command line
     settings_for_apply = {}
-    apply_handleopts (settings_for_apply)
+    apply_handleopts(settings_for_apply)
     configfile = settings_for_apply["configfile"]
-    
+
     # read cluster settings from config file
     if os.path.exists(configfile):
         cluster_settings = yaml.safe_load(open(configfile).read())
-                
+
     # find host os distro
     dist = distro()
     match dist:
@@ -506,18 +534,18 @@ def cmd_deploy():
             deployer = Deployer_Ubuntu(cluster_settings)
         case other:
             usage("platform '{}' not implemented yet.".format(dist))
-    
+
     # deploy cluster
     deployer.deploy()
 
+
 if __name__ == "__main__":
     load_settings()
-    
+
     command = sys.argv[1]
     # argv[1] must be one of:
     match command:
         case 'deploy':
             cmd_deploy()
         case other:
-            usage ('command "{}" not recognized.'.format(command))
-    
+            usage('command "{}" not recognized.'.format(command))
