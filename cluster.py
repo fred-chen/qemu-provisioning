@@ -194,6 +194,9 @@ class Deployer_Ubuntu(IDeployer):
             os.chmod(script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR)
             return True
 
+class Deployer_CentOS(Deployer_Ubuntu):
+    pass
+
 
 class NodeDeployer_Ubuntu:
     def __init__(self, settings: dict):
@@ -532,6 +535,8 @@ def cmd_deploy():
     match dist:
         case "Ubuntu":
             deployer = Deployer_Ubuntu(cluster_settings)
+        case "CentOS Stream":
+            deployer = Deployer_CentOS(cluster_settings)
         case other:
             usage("platform '{}' not implemented yet.".format(dist))
 
