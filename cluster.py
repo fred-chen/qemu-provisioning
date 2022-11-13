@@ -266,7 +266,7 @@ class NodeDeployer_Ubuntu:
         i = 1
         for size in dataDiskSizes:
             cmd = "qemu-img create -f qcow2 {disk_dir}/data{n}.qcow2 {dataDiskSize}".format(
-                disk_dir=node_dir, n=i, dataDiskSize=size)
+                disk_dir=node_dir, n=i, dataDiskSize=size["size"])
             i += 1
             exe(cmd)
 
@@ -321,10 +321,12 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
         nodeName = self.node_settings["name"]
         node_dir = clusterName + "/" + nodeName
         for size in dataDiskSizes:
+            if not "type" in size:
+                size["type"] = "virtio-blk-pci"
             script += """\
 -drive file=data{n}.qcow2,format=qcow2,if=none,id=D{n},cache=none \\
--device virtio-blk-pci,drive=D{n} \\
-""".format(disk_dir=node_dir, n=i)
+-device {devtype},drive=D{n},serial=qemu_drive_{n} \\
+""".format(disk_dir=node_dir, devtype=size["type"], n=i)
             i += 1
 
         script += """\

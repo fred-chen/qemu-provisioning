@@ -8,10 +8,14 @@ imagePath: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-a
 guestOs: Ubuntu # Ubuntu or CentOS7, CentOS8, Alma8, Alma9
 systemDiskSize: 20g
 dataDiskSizes:
-  - 100g
-  - 90g
-  - 80g
-  - 70g
+  - size: 100g # capacity
+    type: virtio-blk-pci # adapter type: virtio-blk-pci, scsi-hd, nvme, ide-hd...
+  - size: 100g
+    type: virtio-blk-pci
+  - size: 100g
+    type: virtio-blk-pci
+  - size: 100g
+    type: nvme
 cpu: 2
 mem: 4g
 mtu: 9000

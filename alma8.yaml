@@ -4,10 +4,14 @@ imagePath: https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-
 guestOs: Alma8 # Ubuntu or CentOS7, CentOS8, Alma8, Alma9
 systemDiskSize: 40g
 dataDiskSizes:
-  - 100g
-  - 90g
-  - 80g
-  - 70g
+  - size: 100g # capacity
+    type: virtio-blk-pci # adapter type: virtio-blk-pci, scsi-hd, nvme, ide-hd...
+  - size: 100g
+    type: virtio-blk-pci
+  - size: 100g
+    type: virtio-blk-pci
+  - size: 100g
+    type: nvme
 cpu: 2
 mem: 4g
 mtu: 9000
