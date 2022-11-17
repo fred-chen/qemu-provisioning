@@ -95,6 +95,13 @@ def randomMAC(type="xen"):
     return ':'.join(map(lambda x: "%02x" % x, mac))
 
 
+def get_free_port():
+    import socket
+    sock = socket.socket()
+    sock.bind(('', 0))
+    return sock.getsockname()[1]
+
+
 def exe(cmd: str) -> int:
     rt = subprocess.call(cmd, shell=True)
     if rt != 0:
@@ -159,29 +166,23 @@ class Deployer_Ubuntu(IDeployer):
             #   |- node3
             os.mkdir(clusterName)
             nodes = self.settings["nodes"]
-            vnc_port = 0
             for node in nodes:
                 match node["guestOs"]:
                     case "Ubuntu":
                         nodeDeployer = NodeDeployer_Ubuntu(node)
-                        nodeDeployer.create_node(vnc_port)
-                        vnc_port += 1
+                        nodeDeployer.create_node(get_free_port())
                     case "CentOS7":
                         nodeDeployer = NodeDeployer_CentOS7(node)
-                        nodeDeployer.create_node(vnc_port)
-                        vnc_port += 1
+                        nodeDeployer.create_node(get_free_port())
                     case "CentOS8":
                         nodeDeployer = NodeDeployer_CentOS7(node)
-                        nodeDeployer.create_node(vnc_port)
-                        vnc_port += 1
+                        nodeDeployer.create_node(get_free_port())
                     case "Alma8":
                         nodeDeployer = NodeDeployer_Alma8(node)
-                        nodeDeployer.create_node(vnc_port)
-                        vnc_port += 1
+                        nodeDeployer.create_node(get_free_port())
                     case "Alma9":
                         nodeDeployer = NodeDeployer_Alma9(node)
-                        nodeDeployer.create_node(vnc_port)
-                        vnc_port += 1
+                        nodeDeployer.create_node(get_free_port())
                     case other:
                         pass
             # create start_cluster.sh
@@ -193,6 +194,7 @@ class Deployer_Ubuntu(IDeployer):
             f_start_cluster.close()
             os.chmod(script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR)
             return True
+
 
 class Deployer_CentOS(Deployer_Ubuntu):
     pass
@@ -292,11 +294,12 @@ NAME={node}
 [[ -z $NAME ]] && {{ echo "err: VM name is missing in command line"; exit 1; }}
 br=`ip link show dev br0 | wc -l`
 [[ $br -eq 0 ]] && exit 1
-tap=`ip link show dev tap$NAME | wc -l`
+tap=`ip link show dev tap$NAME 2>/dev/null | wc -l`
 [[ $tap -gt 0 ]] && {{ ip link del dev tap$NAME; }}
 create_tap tap$NAME
 
-qemu-system-x86_64 -vnc :{vnc_port} \\
+qemu-system-x86_64 \\
+-display vnc=:0,to=100 \\
 -machine pc,accel=kvm \\
 -smp cpus={cpus} \\
 -cpu host \\
@@ -311,8 +314,7 @@ qemu-system-x86_64 -vnc :{vnc_port} \\
            cpus=self.node_settings["cpu"],
            mem=self.node_settings["mem"],
            mtu=self.node_settings["mtu"],
-           mac=mac,
-           vnc_port=port
+           mac=mac
            )
 
         i = 1
