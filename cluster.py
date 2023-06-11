@@ -171,11 +171,14 @@ class Deployer_Ubuntu(IDeployer):
                     case "Ubuntu":
                         nodeDeployer = NodeDeployer_Ubuntu(node)
                         nodeDeployer.create_node(get_free_port())
+                    case "Debian GNU/Linux":
+                        nodeDeployer = NodeDeployer_Debian(node)
+                        nodeDeployer.create_node(get_free_port())
                     case "CentOS7":
                         nodeDeployer = NodeDeployer_CentOS7(node)
                         nodeDeployer.create_node(get_free_port())
                     case "CentOS8":
-                        nodeDeployer = NodeDeployer_CentOS7(node)
+                        nodeDeployer = NodeDeployer_CentOS8(node)
                         nodeDeployer.create_node(get_free_port())
                     case "Alma8":
                         nodeDeployer = NodeDeployer_Alma8(node)
@@ -197,6 +200,8 @@ class Deployer_Ubuntu(IDeployer):
 
 
 class Deployer_CentOS(Deployer_Ubuntu):
+    pass
+class Deployer_Debian(Deployer_Ubuntu):
     pass
 
 
@@ -485,6 +490,10 @@ class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
     pass
 
 
+class NodeDeployer_Debian(NodeDeployer_Ubuntu):
+    pass
+
+
 class NodeDeployer_Alma8(NodeDeployer_CentOS8):
     def gen_user(self, node_settings, mac: str) -> str:
         content = super().gen_user(node_settings, mac) + os.linesep
@@ -541,6 +550,8 @@ def cmd_deploy():
             deployer = Deployer_Ubuntu(cluster_settings)
         case "CentOS Stream":
             deployer = Deployer_CentOS(cluster_settings)
+        case "Debian GNU/Linux":
+            deployer = Deployer_Debian(cluster_settings)
         case other:
             usage("platform '{}' not implemented yet.".format(dist))
 

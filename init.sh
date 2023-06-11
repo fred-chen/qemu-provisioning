@@ -23,7 +23,7 @@ main () {
     source /etc/os-release && echo "OS: $NAME"
 
     case $NAME in
-        "Ubuntu") init_ubuntu
+        "Ubuntu"|"Debian GNU/Linux") init_ubuntu
             ;;
         *) echo "Unsupported OS Distribution"
             ;;
