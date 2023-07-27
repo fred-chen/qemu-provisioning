@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import yaml
 import os
 import stat
 import getopt
@@ -9,49 +8,90 @@ import urllib.parse as parse
 import platform
 import subprocess
 import random
+import requests
+import socket
+import yaml
 
 g_settings = {}
 
 
 def load_settings():
+    """load settings from settings.yaml in script directory
+    """
     g_settings.update(yaml.safe_load(
-        open(script_path() + "/" + "settings.yaml").read()))
+        open(script_path() + "/" + "settings.yaml", encoding='utf-8').read()))
 
 
-def basenameurl(url: str):
+def basenameurl(url: str) -> str:
+    """get the last part of a url
+
+    Args:
+        url (str): a url string
+
+    Returns:
+        str: the basename of the url
+    """
     basename = os.path.basename(url)
     return basename
 
 
-def download_to(url, target_dir=None):
-    import requests
+def download_to(url: str, target_dir: str = None) -> str:
+    """download a file indicated by the url to target_dir
+
+    Args:
+        url (str): the file to download in url form
+        target_dir (str, optional): the target folder to store the downloaded 
+                                    file. Defaults to None.
+
+    Returns:
+        str: the filepath if successfully downloaded, otherwise None
+    """
     if not target_dir:
         target_dir = g_settings["cloud-image-dir"]
     filepath = target_dir + "/" + basenameurl(url)
     if not os.path.exists(filepath):
         print("downloading to " + filepath)
-        response = requests.get(url)
+        response = requests.get(url, timeout=None)
         open(filepath, "wb").write(response.content)
     return filepath
 
 
 def check_path(path: str):
+    """check the existence of a path
+
+    Args:
+        path (str): the path to check
+
+    Returns:
+        str: return the path if exists, otherwize return 
+                the cloud-image-dir if exits, else None
+    """
     localpath = path
     if not os.path.exists(localpath):
         localpath = g_settings["cloud-image-dir"] + "/" + localpath
         if not localpath:
-            raise (Exception("{} does not exist!".format(path)))
+            raise ValueError(f"{path} does not exist!")
     return localpath
 
 
 def script_path() -> str:
+    """return the local path where the script is under
+
+    Returns:
+        str: the path
+    """
     return os.path.dirname(__file__)
 
 
 def usage(err: str):
-    print("Usage: {} deploy -f xxx.yaml".format(os.path.basename(sys.argv[0])))
+    """print the usage and exit
+
+    Args:
+        err (str): the error message that printed along with usage text
+    """
+    print(f"Usage: {os.path.basename(sys.argv[0])} deploy -f xxx.yaml")
     print(err)
-    exit(1)
+    sys.exit(1)
 
 # this function is directly from xend/server/netif.py and is thus
 # available under the LGPL,
@@ -59,7 +99,7 @@ def usage(err: str):
 # Copyright 2005 XenSource Ltd
 
 
-def randomMAC(type="xen"):
+def random_mac(mac_type="xen"):
     """Generate a random MAC address.
 
     00-16-3E allocated to xensource
@@ -70,13 +110,13 @@ def randomMAC(type="xen"):
     The remaining 3 fields are random, with the first bit of the first
     random field set 0.
 
-    >>> randomMAC().startswith("00:16:3E")
+    >>> random_mac().startswith("00:16:3E")
     True
-    >>> randomMAC("foobar").startswith("00:16:3E")
+    >>> random_mac("foobar").startswith("00:16:3E")
     True
-    >>> randomMAC("xen").startswith("00:16:3E")
+    >>> random_mac("xen").startswith("00:16:3E")
     True
-    >>> randomMAC("qemu").startswith("52:54:00")
+    >>> random_mac("qemu").startswith("52:54:00")
     True
 
     @return: MAC address string
@@ -84,7 +124,7 @@ def randomMAC(type="xen"):
     ouis = {'xen': [0x00, 0x16, 0x3E], 'qemu': [0x52, 0x54, 0x00]}
 
     try:
-        oui = ouis[type]
+        oui = ouis[mac_type]
     except KeyError:
         oui = ouis['xen']
 
@@ -96,37 +136,61 @@ def randomMAC(type="xen"):
 
 
 def get_free_port():
-    import socket
+    """get a free port number
+
+    Returns:
+        int: a port number
+    """
     sock = socket.socket()
     sock.bind(('', 0))
     return sock.getsockname()[1]
 
 
 def exe(cmd: str) -> int:
-    rt = subprocess.call(cmd, shell=True)
-    if rt != 0:
-        raise "error when executing:\n {}\n".format(cmd)
+    """run a command
+
+    Args:
+        cmd (str): the command string
+
+    Raises:
+        ValueError: error raised if failed to execute the command
+
+    Returns:
+        int: the exit code of the command
+    """
+    return_code = subprocess.call(cmd, shell=True)
+    if return_code != 0:
+        raise ValueError(f"error when executing:\n {cmd}\n")
+    return return_code
 
 
 def apply_handleopts(settings: dict):
+    """handle command line arguments
+
+    Args:
+        settings (dict): the setting dict to store the settings
+    """
     try:
         options, args = getopt.gnu_getopt(sys.argv[2:], "f:", ["configfile="])
     except getopt.GetoptError as err:
         usage(err)
-    for o, a in options:
-        if (o in ('-f', '--configfile')):
-            settings["configfile"] = a
+    for option, arg in options:
+        if option in ('-f', '--configfile'):
+            settings["configfile"] = arg
     for operation in args:
         print(operation)
 
 
 class IDeployer:
+    """A common interface for all Deployers
+    """
+
     def __init__(self, settings: dict):
         self.settings = settings
         self.flatten_settings()
 
     def create_cluster(self) -> bool:
-        raise "Error: not implemented"
+        raise ValueError("Error: not implemented")
 
     def flatten_settings(self):
         # use cluster settings as defaults and populate to all nodes
@@ -234,6 +298,7 @@ class NodeDeployer_Ubuntu:
         clusterName = self.node_settings["clusterName"]
         imagePath = self.node_settings["imagePath"]
         nodeName = self.node_settings["name"]
+        print("nodeName={}".format(nodeName));
         systemDiskSize = self.node_settings["systemDiskSize"]
         dataDiskSizes = self.node_settings["dataDiskSizes"]
 
@@ -265,15 +330,12 @@ class NodeDeployer_Ubuntu:
 
         # prepare system.qcow2 and dataX.qcow2 (if defined)
         node_dir = clusterName + "/" + nodeName
-        cmd = "qemu-img create -f qcow2 -F qcow2 -b {image_path} {disk_dir}/system.qcow2 {systemDiskSize}"
-        cmd = cmd.format(image_path=localImage,
-                         disk_dir=node_dir, systemDiskSize=systemDiskSize)
+        cmd = f"qemu-img create -f qcow2 -F qcow2 -b {localImage} {node_dir}/system.qcow2 {systemDiskSize}"
         exe(cmd)
 
         i = 1
         for size in dataDiskSizes:
-            cmd = "qemu-img create -f qcow2 {disk_dir}/data{n}.qcow2 {dataDiskSize}".format(
-                disk_dir=node_dir, n=i, dataDiskSize=size["size"])
+            cmd = f"qemu-img create -f qcow2 {node_dir}/data{i}.qcow2 {size['size']}"
             i += 1
             exe(cmd)
 
@@ -433,7 +495,7 @@ qemu-system-x86_64 \\
         return yaml.safe_dump(content, width=1000)
 
     def gen_mac(self, qemu_or_xen):
-        return randomMAC(qemu_or_xen)
+        return random_mac(qemu_or_xen)
 
     def write_meta(self, mac: str):
         clusterName = self.node_settings["clusterName"]

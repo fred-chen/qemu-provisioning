@@ -1,0 +1,12 @@
+{
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "editor.minimap.maxColumn": 120,
+    "python.formatting.autopep8Args": [
+        "--max-line-length=80"
+    ],
+    "python.formatting.blackArgs": [
+        "--line-length=80"
+    ],
+    "editor.wordWrap": "wordWrapColumn"
+}
