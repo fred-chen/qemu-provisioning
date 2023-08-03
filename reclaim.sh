@@ -36,5 +36,5 @@ echo "temp dir: $temp_dir"
 
 # use virt-sparsify to reclaim the space of the qcow2 file
 echo "virt-sparsify --tmp $temp_dir $qcow2_file temp.$qcow2_file"
-flock -x -w1 $qcow2_file virt-sparsify --tmp $temp_dir $qcow2_file temp.$qcow2_file || exit 1
-mv temp.$qcow2_file $qcow2_file || exit 1
+flock -x -w1 $qcow2_file virt-sparsify --tmp $temp_dir $qcow2_file $temp_dir/temp.$qcow2_file || exit 1
+mv $temp_dir/temp.$qcow2_file $qcow2_file || exit 1
