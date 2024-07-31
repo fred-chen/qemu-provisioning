@@ -272,6 +272,7 @@ class Deployer_Debian(Deployer_Ubuntu):
 class NodeDeployer_Ubuntu:
     def __init__(self, settings: dict):
         self.node_settings = settings
+        self.qemu_bin = "qemu-system-x86_64"
 
     def create_node(self, port: int):
         """create a single node structure
@@ -365,7 +366,7 @@ tap=`ip link show dev tap$NAME 2>/dev/null | wc -l`
 [[ $tap -gt 0 ]] && {{ ip link del dev tap$NAME; }}
 create_tap tap$NAME
 
-qemu-system-x86_64 \\
+{qemubin} \\
 -display vnc=:0,to=100 \\
 -machine pc,accel=kvm \\
 -smp cpus={cpus} \\
@@ -378,6 +379,7 @@ qemu-system-x86_64 \\
 -device virtio-net-pci,netdev=mynet0,mac={mac} \\
 -boot c \\
 """.format(node=self.node_settings["name"],
+           qemubin=self.qemu_bin,
            cpus=self.node_settings["cpu"],
            mem=self.node_settings["mem"],
            mtu=self.node_settings["mtu"],
@@ -545,12 +547,12 @@ qemu-system-x86_64 \\
 
 
 class NodeDeployer_CentOS7(NodeDeployer_Ubuntu):
-    pass
-
+    def __init__(self, settings: dict):
+        self.node_settings = settings
+        self.qemu_bin = "/usr/libexec/qemu-kvm"
 
 class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
     pass
-
 
 class NodeDeployer_Debian(NodeDeployer_Ubuntu):
     pass
@@ -610,7 +612,7 @@ def cmd_deploy():
     match dist:
         case "Ubuntu":
             deployer = Deployer_Ubuntu(cluster_settings)
-        case "CentOS Stream":
+        case "CentOS Stream" | "Rocky Linux":
             deployer = Deployer_CentOS(cluster_settings)
         case "Debian GNU/Linux":
             deployer = Deployer_Debian(cluster_settings)

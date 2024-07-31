@@ -1,1 +1,1 @@
-cloud-image-dir: /share/qemu/storage/cloud-images
+cloud-image-dir: /workspace/qemu/cloud_images
