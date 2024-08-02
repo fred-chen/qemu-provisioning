@@ -198,12 +198,13 @@ class IDeployer:
         for node in nodes:
             for key in ("clusterName", "domainName", "imagePath",
                         "systemDiskSize", "dataDiskSizes", "cpu", "mem", "mtu", "gateway",
-                        "nameserver", "guestOs", "authorized-keys"):
+                        "nameserver", "guestOs", "authorized-keys", "qemubin"):
                 node[key] = self.settings[key] if key not in node else node[key]
 
 
 class Deployer_Ubuntu(IDeployer):
     def __init__(self, settings: dict):
+        settings["qemubin"] = "qemu-system-x86_64"
         IDeployer.__init__(self, settings)
 
     def deploy(self) -> bool:
@@ -264,7 +265,9 @@ class Deployer_Ubuntu(IDeployer):
 
 
 class Deployer_CentOS(Deployer_Ubuntu):
-    pass
+    def __init__(self, settings: dict):
+        settings["qemubin"] = "/usr/libexec/qemu-kvm"
+        IDeployer.__init__(self, settings)
 class Deployer_Debian(Deployer_Ubuntu):
     pass
 
@@ -272,7 +275,7 @@ class Deployer_Debian(Deployer_Ubuntu):
 class NodeDeployer_Ubuntu:
     def __init__(self, settings: dict):
         self.node_settings = settings
-        self.qemu_bin = "qemu-system-x86_64"
+        self.qemubin = settings["qemubin"]
 
     def create_node(self, port: int):
         """create a single node structure
@@ -379,7 +382,7 @@ create_tap tap$NAME
 -device virtio-net-pci,netdev=mynet0,mac={mac} \\
 -boot c \\
 """.format(node=self.node_settings["name"],
-           qemubin=self.qemu_bin,
+           qemubin=self.qemubin,
            cpus=self.node_settings["cpu"],
            mem=self.node_settings["mem"],
            mtu=self.node_settings["mtu"],
@@ -547,18 +550,9 @@ create_tap tap$NAME
 
 
 class NodeDeployer_CentOS7(NodeDeployer_Ubuntu):
-    def __init__(self, settings: dict):
-        self.node_settings = settings
-        self.qemu_bin = "/usr/libexec/qemu-kvm"
+    pass
 
 class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
-    pass
-
-class NodeDeployer_Debian(NodeDeployer_Ubuntu):
-    pass
-
-
-class NodeDeployer_Alma8(NodeDeployer_CentOS8):
     def gen_user(self, node_settings, mac: str) -> str:
         content = super().gen_user(node_settings, mac) + os.linesep
         content += 'bootcmd:' + os.linesep + \
@@ -583,14 +577,18 @@ class NodeDeployer_Alma8(NodeDeployer_CentOS8):
             '    gateway {}'.format(
                 node_settings["gateway"]) + os.linesep
         return content
-
     def gen_netconf(self, node_settings, mac: str) -> str:
         return ""
 
+class NodeDeployer_Debian(NodeDeployer_Ubuntu):
+    pass
+
+
+class NodeDeployer_Alma8(NodeDeployer_CentOS8):
+    pass
 
 class NodeDeployer_Alma9(NodeDeployer_Alma8):
     pass
-
 
 def distro() -> str:
     v = platform.freedesktop_os_release()
