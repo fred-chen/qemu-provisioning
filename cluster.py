@@ -320,6 +320,7 @@ class NodeDeployer_Ubuntu:
 
         # generating mac address for vm
         mac = self.gen_mac("qemu")
+        mac1 = self.gen_mac("qemu")
 
         # prepare cloud-init config files
         self.write_meta(mac)
@@ -344,30 +345,44 @@ class NodeDeployer_Ubuntu:
             exe(cmd)
 
         # prepare start.sh
-        self.write_startup_script(mac, port)
+        self.write_startup_script(mac, mac1, port)
 
-    def gen_startup_script(self, mac: str, port: int):
+    def gen_startup_script(self, mac: str, mac1: str, port: int):
+        """
+            the host must create 2 bridges before deploy qemu virtual machines:
+            1. br0 for public access
+            2. br1 for private data link
+        """
         script = """\
 #!/usr/bin/bash
 
 function create_tap
 {{
     tapname=$1
+    brname=$2
     [[ -z $tapname ]] && {{ >&2 echo "err: must specify a name for a tap device"; return 1; }}
     ip tuntap add dev $tapname mode tap
     ip link set dev $tapname mtu {mtu}
     ip link set dev $tapname up
-    ip link set dev $tapname master br0
+    ip link set dev $tapname master $brname
 }}
 
-NAME={node}
+PUBLIC_NAME={node}-pub
+PRIVATE_NAME={node}-pri
 
-[[ -z $NAME ]] && {{ echo "err: VM name is missing in command line"; exit 1; }}
+[[ -z $PUBLIC_NAME ]] && {{ echo "err: VM name is missing in command line"; exit 1; }}
 br=`ip link show dev br0 | wc -l`
 [[ $br -eq 0 ]] && exit 1
-tap=`ip link show dev tap$NAME 2>/dev/null | wc -l`
-[[ $tap -gt 0 ]] && {{ ip link del dev tap$NAME; }}
-create_tap tap$NAME
+tap=`ip link show dev tap$PUBLIC_NAME 2>/dev/null | wc -l`
+[[ $tap -gt 0 ]] && {{ ip link del dev tap$PUBLIC_NAME; }}
+create_tap tap$PUBLIC_NAME br0
+
+[[ -z $PRIVATE_NAME ]] && {{ echo "err: VM name is missing in command line"; exit 1; }}
+br=`ip link show dev br1 | wc -l`
+[[ $br -eq 0 ]] && exit 1
+tap=`ip link show dev tap$PRIVATE_NAME 2>/dev/null | wc -l`
+[[ $tap -gt 0 ]] && {{ ip link del dev tap$PRIVATE_NAME; }}
+create_tap tap$PRIVATE_NAME br1
 
 {qemubin} \\
 -display vnc=:0,to=100 \\
@@ -378,15 +393,18 @@ create_tap tap$NAME
 -drive file=system.qcow2,format=qcow2,if=none,id=D0,cache=none \\
 -device virtio-blk-pci,drive=D0 \\
 -drive file=cloud-init/cloud-init-provisioning.iso,media=cdrom \\
--netdev tap,id=mynet0,ifname=tap$NAME,script=no,downscript=no \\
+-netdev tap,id=mynet0,ifname=tap$PUBLIC_NAME,script=no,downscript=no \\
 -device virtio-net-pci,netdev=mynet0,mac={mac} \\
+-netdev tap,id=mynet1,ifname=tap$PRIVATE_NAME,script=no,downscript=no \\
+-device virtio-net-pci,netdev=mynet1,mac={mac1} \\
 -boot c \\
 """.format(node=self.node_settings["name"],
            qemubin=self.qemubin,
            cpus=self.node_settings["cpu"],
            mem=self.node_settings["mem"],
            mtu=self.node_settings["mtu"],
-           mac=mac
+           mac=mac,
+           mac1=mac1
            )
 
         i = 1
@@ -536,7 +554,7 @@ create_tap tap$NAME
         f_user.write(self.gen_user(self.node_settings, mac))
         f_user.close()
 
-    def write_startup_script(self, mac, port):
+    def write_startup_script(self, mac, mac1, port):
         # prepare start.sh
         clusterName = self.node_settings["clusterName"]
         nodeName = self.node_settings["name"]
@@ -544,7 +562,7 @@ create_tap tap$NAME
         node_dir = clusterName + "/" + nodeName
         start_script_path = node_dir + "/" + "start.sh"
         f_startup_script = open(start_script_path, 'wb')
-        f_startup_script.write(self.gen_startup_script(mac, port))
+        f_startup_script.write(self.gen_startup_script(mac, mac1, port))
         f_startup_script.close()
         os.chmod(start_script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR)
 

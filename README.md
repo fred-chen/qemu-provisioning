@@ -1,6 +1,10 @@
 # qemu-provisioning
 Provision a qemu virtual machine cluster from command line.
 
+## Pre-requisite
+Two bridges should be created on host OS before deploying qemu virtual machines:
+1. 'br0', for public network
+2. 'br1', for private network
 
 ## Command line
 
