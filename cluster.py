@@ -440,7 +440,7 @@ create_tap tap$PRIVATE_NAME br1
 
             hostname: node0
             fqdn: node0.chenp.net
-            manage_etc_hosts: true
+            manage_etc_hosts: false
 
             ssh_pwauth: false
             disable_root: false
@@ -458,7 +458,7 @@ create_tap tap$PRIVATE_NAME br1
         content = {
             "hostname": node_settings["name"],
             "fqdn": node_settings["name"] + "." + str.strip(node_settings["domainName"], "."),
-            "manage_etc_hosts": True,
+            "manage_etc_hosts": false,
             "ssh_pwauth": False,
             "disable_root": False,
             "users": [
