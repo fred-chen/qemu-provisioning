@@ -212,6 +212,7 @@ class Deployer_Ubuntu(IDeployer):
 
         if os.path.exists(clusterName):
             # cluster folder already exists
+            print(f"folder {clusterName} already exists.", file=sys.stderr)
             return False
         else:
             # create cluster folder
@@ -458,7 +459,7 @@ create_tap tap$PRIVATE_NAME br1
         content = {
             "hostname": node_settings["name"],
             "fqdn": node_settings["name"] + "." + str.strip(node_settings["domainName"], "."),
-            "manage_etc_hosts": false,
+            "manage_etc_hosts": False,
             "ssh_pwauth": False,
             "disable_root": False,
             "users": [
