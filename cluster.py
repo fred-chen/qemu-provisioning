@@ -6,6 +6,7 @@ import getopt
 import sys
 import urllib.parse as parse
 import platform
+import distro
 import subprocess
 import random
 import requests
@@ -233,27 +234,26 @@ class Deployer_Ubuntu(IDeployer):
             os.mkdir(clusterName)
             nodes = self.settings["nodes"]
             for node in nodes:
-                match node["guestOs"]:
-                    case "Ubuntu":
-                        nodeDeployer = NodeDeployer_Ubuntu(node)
-                        nodeDeployer.create_node(get_free_port())
-                    case "Debian GNU/Linux":
-                        nodeDeployer = NodeDeployer_Debian(node)
-                        nodeDeployer.create_node(get_free_port())
-                    case "CentOS7":
-                        nodeDeployer = NodeDeployer_CentOS7(node)
-                        nodeDeployer.create_node(get_free_port())
-                    case "CentOS8":
-                        nodeDeployer = NodeDeployer_CentOS8(node)
-                        nodeDeployer.create_node(get_free_port())
-                    case "Alma8":
-                        nodeDeployer = NodeDeployer_Alma8(node)
-                        nodeDeployer.create_node(get_free_port())
-                    case "Alma9":
-                        nodeDeployer = NodeDeployer_Alma9(node)
-                        nodeDeployer.create_node(get_free_port())
-                    case other:
-                        pass
+                if node["guestOs"] == "Ubuntu":
+                    nodeDeployer = NodeDeployer_Ubuntu(node)
+                    nodeDeployer.create_node(get_free_port())
+                elif node["guestOs"] == "Debian GNU/Linux":
+                    nodeDeployer = NodeDeployer_Debian(node)
+                    nodeDeployer.create_node(get_free_port())
+                elif node["guestOs"] == "CentOS7":
+                    nodeDeployer = NodeDeployer_CentOS7(node)
+                    nodeDeployer.create_node(get_free_port())
+                elif node["guestOs"] == "CentOS8":
+                    nodeDeployer = NodeDeployer_CentOS8(node)
+                    nodeDeployer.create_node(get_free_port())
+                elif node["guestOs"] == "Alma8":
+                    nodeDeployer = NodeDeployer_Alma8(node)
+                    nodeDeployer.create_node(get_free_port())
+                elif node["guestOs"] == "Alma9":
+                    nodeDeployer = NodeDeployer_Alma9(node)
+                    nodeDeployer.create_node(get_free_port())
+                else:
+                    pass
             # create start_cluster.sh
             script_path = clusterName + "/" + "start_cluster.sh"
             f_start_cluster = open(script_path, 'w')
@@ -269,6 +269,8 @@ class Deployer_CentOS(Deployer_Ubuntu):
     def __init__(self, settings: dict):
         settings["qemubin"] = "/usr/libexec/qemu-kvm"
         IDeployer.__init__(self, settings)
+
+
 class Deployer_Debian(Deployer_Ubuntu):
     pass
 
@@ -303,7 +305,7 @@ class NodeDeployer_Ubuntu:
         clusterName = self.node_settings["clusterName"]
         imagePath = self.node_settings["imagePath"]
         nodeName = self.node_settings["name"]
-        print("nodeName={}".format(nodeName));
+        print("nodeName={}".format(nodeName))
         systemDiskSize = self.node_settings["systemDiskSize"]
         dataDiskSizes = self.node_settings["dataDiskSizes"]
 
@@ -322,6 +324,7 @@ class NodeDeployer_Ubuntu:
         # generating mac address for vm
         mac = self.gen_mac("qemu")
         mac1 = self.gen_mac("qemu")
+        mac2 = self.gen_mac("qemu")
 
         # prepare cloud-init config files
         self.write_meta(mac)
@@ -346,13 +349,14 @@ class NodeDeployer_Ubuntu:
             exe(cmd)
 
         # prepare start.sh
-        self.write_startup_script(mac, mac1, port)
+        self.write_startup_script(mac, mac1, mac2, port)
 
-    def gen_startup_script(self, mac: str, mac1: str, port: int):
+    def gen_startup_script(self, mac: str, mac1: str, mac2: str, port: int):
         """
             the host must create 2 bridges before deploy qemu virtual machines:
             1. br0 for public access
-            2. br1 for private data link
+            2. br1 for private data link 1
+            3. br2 for private data link 2
         """
         script = """\
 #!/usr/bin/bash
@@ -370,6 +374,7 @@ function create_tap
 
 PUBLIC_NAME={node}-pub
 PRIVATE_NAME={node}-pri
+PRIVATE_NAME1={node}-pri1
 
 [[ -z $PUBLIC_NAME ]] && {{ echo "err: VM name is missing in command line"; exit 1; }}
 br=`ip link show dev br0 | wc -l`
@@ -385,6 +390,13 @@ tap=`ip link show dev tap$PRIVATE_NAME 2>/dev/null | wc -l`
 [[ $tap -gt 0 ]] && {{ ip link del dev tap$PRIVATE_NAME; }}
 create_tap tap$PRIVATE_NAME br1
 
+[[ -z $PRIVATE_NAME1 ]] && {{ echo "err: VM name is missing in command line"; exit 1; }}
+br=`ip link show dev br2 | wc -l`
+[[ $br -eq 0 ]] && exit 1
+tap=`ip link show dev tap$PRIVATE_NAME1 2>/dev/null | wc -l`
+[[ $tap -gt 0 ]] && {{ ip link del dev tap$PRIVATE_NAME1; }}
+create_tap tap$PRIVATE_NAME1 br2
+
 {qemubin} \\
 -display vnc=:0,to=100 \\
 -machine pc,accel=kvm \\
@@ -398,6 +410,8 @@ create_tap tap$PRIVATE_NAME br1
 -device virtio-net-pci,netdev=mynet0,mac={mac} \\
 -netdev tap,id=mynet1,ifname=tap$PRIVATE_NAME,script=no,downscript=no \\
 -device virtio-net-pci,netdev=mynet1,mac={mac1} \\
+-netdev tap,id=mynet2,ifname=tap$PRIVATE_NAME1,script=no,downscript=no \\
+-device virtio-net-pci,netdev=mynet2,mac={mac2} \\
 -boot c \\
 """.format(node=self.node_settings["name"],
            qemubin=self.qemubin,
@@ -405,7 +419,8 @@ create_tap tap$PRIVATE_NAME br1
            mem=self.node_settings["mem"],
            mtu=self.node_settings["mtu"],
            mac=mac,
-           mac1=mac1
+           mac1=mac1,
+           mac2=mac2
            )
 
         i = 1
@@ -555,7 +570,7 @@ create_tap tap$PRIVATE_NAME br1
         f_user.write(self.gen_user(self.node_settings, mac))
         f_user.close()
 
-    def write_startup_script(self, mac, mac1, port):
+    def write_startup_script(self, mac, mac1, mac2, port):
         # prepare start.sh
         clusterName = self.node_settings["clusterName"]
         nodeName = self.node_settings["name"]
@@ -563,13 +578,14 @@ create_tap tap$PRIVATE_NAME br1
         node_dir = clusterName + "/" + nodeName
         start_script_path = node_dir + "/" + "start.sh"
         f_startup_script = open(start_script_path, 'wb')
-        f_startup_script.write(self.gen_startup_script(mac, mac1, port))
+        f_startup_script.write(self.gen_startup_script(mac, mac1, mac2, port))
         f_startup_script.close()
         os.chmod(start_script_path, stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR)
 
 
 class NodeDeployer_CentOS7(NodeDeployer_Ubuntu):
     pass
+
 
 class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
     def gen_user(self, node_settings, mac: str) -> str:
@@ -596,8 +612,10 @@ class NodeDeployer_CentOS8(NodeDeployer_CentOS7):
             '    gateway {}'.format(
                 node_settings["gateway"]) + os.linesep
         return content
+
     def gen_netconf(self, node_settings, mac: str) -> str:
         return ""
+
 
 class NodeDeployer_Debian(NodeDeployer_Ubuntu):
     pass
@@ -606,12 +624,14 @@ class NodeDeployer_Debian(NodeDeployer_Ubuntu):
 class NodeDeployer_Alma8(NodeDeployer_CentOS8):
     pass
 
+
 class NodeDeployer_Alma9(NodeDeployer_Alma8):
     pass
 
-def distro() -> str:
-    v = platform.freedesktop_os_release()
-    return v["NAME"]
+
+def distro_name() -> str:
+    v = distro.info()
+    return v["id"]
 
 
 def cmd_deploy():
@@ -625,16 +645,15 @@ def cmd_deploy():
         cluster_settings = yaml.safe_load(open(configfile).read())
 
     # find host os distro
-    dist = distro()
-    match dist:
-        case "Ubuntu":
-            deployer = Deployer_Ubuntu(cluster_settings)
-        case "CentOS Stream" | "Rocky Linux":
-            deployer = Deployer_CentOS(cluster_settings)
-        case "Debian GNU/Linux":
-            deployer = Deployer_Debian(cluster_settings)
-        case other:
-            usage("platform '{}' not implemented yet.".format(dist))
+    dist = distro_name()
+    if dist == "Ubuntu":
+        deployer = Deployer_Ubuntu(cluster_settings)
+    elif dist in ["CentOS Stream", "rocky"]:
+        deployer = Deployer_CentOS(cluster_settings)
+    elif dist == "Debian GNU/Linux":
+        deployer = Deployer_Debian(cluster_settings)
+    else:
+        usage("platform '{}' not implemented yet.".format(dist))
 
     # deploy cluster
     deployer.deploy()
@@ -645,8 +664,7 @@ if __name__ == "__main__":
 
     command = sys.argv[1]
     # argv[1] must be one of:
-    match command:
-        case 'deploy':
-            cmd_deploy()
-        case other:
-            usage('command "{}" not recognized.'.format(command))
+    if command == 'deploy':
+        cmd_deploy()
+    else:
+        usage('command "{}" not recognized.'.format(command))
