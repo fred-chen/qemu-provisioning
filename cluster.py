@@ -356,7 +356,7 @@ class NodeDeployer_Ubuntu:
             the host must create 2 bridges before deploy qemu virtual machines:
             1. br0 for public access
             2. br1 for private data link 1
-            3. br2 for private data link 2
+            3. br1 for private data link 2
         """
         script = """\
 #!/usr/bin/bash
@@ -391,11 +391,11 @@ tap=`ip link show dev tap$PRIVATE_NAME 2>/dev/null | wc -l`
 create_tap tap$PRIVATE_NAME br1
 
 [[ -z $PRIVATE_NAME1 ]] && {{ echo "err: VM name is missing in command line"; exit 1; }}
-br=`ip link show dev br2 | wc -l`
+br=`ip link show dev br1 | wc -l`
 [[ $br -eq 0 ]] && exit 1
 tap=`ip link show dev tap$PRIVATE_NAME1 2>/dev/null | wc -l`
 [[ $tap -gt 0 ]] && {{ ip link del dev tap$PRIVATE_NAME1; }}
-create_tap tap$PRIVATE_NAME1 br2
+create_tap tap$PRIVATE_NAME1 br1
 
 {qemubin} \\
 -display vnc=:0,to=100 \\
